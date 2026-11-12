@@ -66,3 +66,24 @@ or inspect swap devices directly:
 ```bash
 su -c cat /proc/swaps
 ```
+
+---
+
+### LSPosed / Vector UI Hook (Settings & Recents RAM Display)
+Stock Android / Custom ROM Settings and Launcher3 Recents panels only query physical hardware DRAM (`MemTotal`). To display the full boosted RAM capacity (`8 GB + 8 GB (Active)` in Settings and `16 GB` in Recents), install the companion hook APK:
+
+1. **Install APK:**
+   - Install `Galaga_8plus8_RAM_Hook_v1.0.apk` directly on your device.
+2. **Enable in LSPosed / Vector:**
+   - Open **LSPosed** or **Vector Manager**.
+   - Enable the **Galaga 8+8 RAM Hook** module.
+   - Set the scope to include:
+     - `System Framework (android)`
+     - `Settings (com.android.settings)`
+     - `System UI (com.android.systemui)`
+     - `Launcher3 / QuickStep (com.android.launcher3)`
+3. **Restart Apps or System UI:**
+   - Force-stop Settings and Launcher3 (or reboot).
+   - Settings -> About Phone will now show: **`RAM: 8 GB + 8 GB (Active)`**
+   - Recents overview will display: **`... available | 16 GB`**
+
