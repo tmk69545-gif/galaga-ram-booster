@@ -12,8 +12,7 @@
 
 On stock Nothing OS, the system includes a proprietary **RAM Booster** feature allowing users to expand their 8GB physical RAM up to **8GB + 8GB (16GB total)**. When flashing Custom ROMs (Project Infinity X, LineageOS, crDroid, Evolution X, PixelOS, etc.), this capability is lost:
 1. The kernel defaults to standard zRAM with no high-capacity storage swap overflow.
-2. The ROM's **Settings $\rightarrow$ About Phone** page hardcodes `8 GB (Active)` and displays a red/full RAM bar if memory pressure rises.
-3. The **Recent Apps panel (Launcher3 QuickStep)** only displays physical DRAM (`3.5 GB available | 7.8 GB`).
+
 
 This project provides a **complete, two-part production-grade solution** replicating the full stock Nothing OS RAM Booster experience on any Custom ROM.
 
@@ -148,7 +147,7 @@ Open KernelSU or Magisk, tap the **Action / WebUI** button next to **Galaga RAM 
 - **Segmented Extension Selector:** Choose `+4G`, `+6G`, `+8G`, `+10G`, or `+12G`.
 - **Backing Architecture:** Select `Hybrid (zRAM + Storage)`, `zRAM Compression Only`, or `Storage Swap Only`.
 - **Swappiness Slider:** Adjust kernel swappiness from `60` to `180`.
-- **Live Diagnostics:** View real-time output from `/proc/swaps` and memory allocation bars.
+Apps Overview**: Displays **`11.5 GB available | 16 GB`** combining physical free DRAM with the +8 GB virtual pool without double-boosting.- **Live Diagnostics:** View real-time output from `/proc/swaps` and memory allocation bars.
 
 ### Method B: Manual Configuration File
 Edit `/data/adb/ram_booster.conf` as root:
@@ -166,23 +165,6 @@ SWAPPINESS=130
 PAGE_CLUSTER=0
 ```
 Changes apply immediately or on next reboot.
-
----
-
-## ❓ Frequently Asked Questions (FAQ)
-
-#### Q1: Why did the Settings RAM bar previously turn red and full?
-**A:** In Project Infinity X's `OosAboutPreference`, the ROM calculates:
-$$\text{used} = \text{totalMem} - \text{availMem}$$
-When `totalMem` was increased to 16 GB while `availMem` remained physical free DRAM ($\approx 1.3\text{ GB}$), the ROM calculated $(16 - 1.3) = 14.7\text{ GB used (92\%)}$, triggering the red critical color. The companion hook now intercepts `usedRamPercentage` and computes it against the full 16 GB capacity, restoring the normal **green** bar at $\approx 28\%$.
-
-#### Q2: Why did Recents previously display 19.3 GB available?
-**A:** An initial build applied the $+8\text{ GB}$ virtual pool in both the `ActivityManager` layer and the `TextView` formatting layer, causing a double-boost:
-$$3.3\text{ GB} + 8\text{ GB} + 8\text{ GB} = 19.3\text{ GB}$$
-The current release leaves `ActivityManager.availMem` at its true physical value (protecting Android's LowMemoryKiller) and adds the virtual pool only once in the Recents formatter, cleanly displaying **`11.5 GB available | 16 GB`**.
-
-#### Q3: Does this cause storage wear?
-**A:** When using **Hybrid Mode** (default), zRAM takes priority 10 and flash swap takes priority 5. Ultra-fast compressed RAM absorbs over 95% of all swapping operations. Flash storage swap is only accessed as an overflow buffer under extreme multitasking, resulting in negligible flash wear. For zero flash wear, select **zRAM Only** mode in the WebUI.
 
 ---
 
