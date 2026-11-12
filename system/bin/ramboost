@@ -1,0 +1,47 @@
+#!/system/bin/sh
+# ==============================================================
+# Nothing Galaga RAM Booster Status Utility
+# Usage: su -c ramboost
+# ==============================================================
+
+echo "=============================================="
+echo "      NOTHING GALAGA RAM BOOSTER STATUS       "
+echo "=============================================="
+
+# 1. Device Info
+DEVICE=$(getprop ro.product.device)
+MODEL=$(getprop ro.product.model)
+echo "[*] Device: $MODEL ($DEVICE)"
+
+# 2. Physical Memory
+TOTAL_PHYSICAL_KB=$(awk '/MemTotal:/ {print $2}' /proc/meminfo)
+FREE_PHYSICAL_KB=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
+TOTAL_PHYSICAL_MB=$((TOTAL_PHYSICAL_KB / 1024))
+FREE_PHYSICAL_MB=$((FREE_PHYSICAL_KB / 1024))
+echo "[*] Physical RAM: ${TOTAL_PHYSICAL_MB} MB total (~$((TOTAL_PHYSICAL_MB / 1024)) GB) | Free: ${FREE_PHYSICAL_MB} MB"
+
+# 3. Swap / Virtual Memory Status
+echo ""
+echo "[*] Active Virtual RAM / Swap Devices:"
+cat /proc/swaps
+
+TOTAL_SWAP_KB=$(awk '/SwapTotal:/ {print $2}' /proc/meminfo)
+FREE_SWAP_KB=$(awk '/SwapFree:/ {print $2}' /proc/meminfo)
+USED_SWAP_KB=$((TOTAL_SWAP_KB - FREE_SWAP_KB))
+echo ""
+echo "[*] Total Virtual Swap: $((TOTAL_SWAP_KB / 1024)) MB | Used: $((USED_SWAP_KB / 1024)) MB | Free: $((FREE_SWAP_KB / 1024)) MB"
+
+# 4. Kernel VM Parameters
+echo ""
+echo "[*] Kernel VM Parameters:"
+echo "    - vm.swappiness: $(cat /proc/sys/vm/swappiness 2>/dev/null)"
+echo "    - vm.page-cluster: $(cat /proc/sys/vm/page-cluster 2>/dev/null)"
+echo "    - vm.vfs_cache_pressure: $(cat /proc/sys/vm/vfs_cache_pressure 2>/dev/null)"
+
+# 5. Service Log
+if [ -f /data/local/tmp/ram_booster.log ]; then
+    echo ""
+    echo "[*] Recent Service Log (/data/local/tmp/ram_booster.log):"
+    tail -n 10 /data/local/tmp/ram_booster.log
+fi
+echo "=============================================="

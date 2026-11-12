@@ -1,0 +1,6 @@
+id=galaga_ram_booster
+name=Galaga RAM Booster (+8GB Virtual RAM)
+version=v1.0
+versionCode=100
+author=Community
+description=Replicates Nothing OS Stock RAM Booster for CMF Phone 2 Pro (Galaga) on Custom ROMs. Adds +8GB Virtual RAM extension (Storage Swap + zRAM) and kernel VM tuning.

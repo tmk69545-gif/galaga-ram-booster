@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>RAM Manager — Galaga</title>
+  <style>
+    :root {
+      --bg: #0c0c0e;
+      --surface: #141417;
+      --surface-raised: #1c1c20;
+      --surface-active: #242429;
+      --border: #222227;
+      --border-focus: #383842;
+      --text-primary: #ededf0;
+      --text-secondary: #8c8c96;
+      --text-muted: #5a5a64;
+      --accent: #e53935;
+      --accent-dim: rgba(229, 57, 53, 0.15);
+      --font-mono: "JetBrains Mono", "SF Mono", "Roboto Mono", Menlo, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.45;
+      padding: 16px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 8px 0 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+      color: var(--text-primary);
+    }
+
+    .header-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+    }
+
+    .card-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: var(--surface-raised);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* Memory visualizer */
+    .memory-visualizer {
+      display: flex;
+      height: 12px;
+      width: 100%;
+      background: #1e1e24;
+      border-radius: 4px;
+      overflow: hidden;
+      margin: 12px 0 16px;
+      border: 1px solid var(--border);
+    }
+
+    .segment-phys-used {
+      background: #4a4a56;
+      transition: width 0.25s ease;
+    }
+
+    .segment-phys-free {
+      background: #2a2a32;
+      transition: width 0.25s ease;
+    }
+
+    .segment-virt-used {
+      background: var(--accent);
+      transition: width 0.25s ease;
+    }
+
+    .segment-virt-free {
+      background: #3e2726;
+      transition: width 0.25s ease;
+    }
+
+    /* Telemetry grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 12px;
+    }
+
+    .telemetry-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .telemetry-label {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .telemetry-value {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .telemetry-value.accent {
+      color: var(--text-primary);
+    }
+
+    /* Segmented Button Groups */
+    .field-label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .chip-group {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .chip {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 9px 0;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+
+    .chip:active {
+      background: var(--surface-active);
+    }
+
+    .chip.selected {
+      background: var(--surface-active);
+      border-color: var(--text-primary);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* Mode List */
+    .mode-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .mode-card {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background 0.12s, border-color 0.12s;
+    }
+
+    .mode-card.selected {
+      background: var(--surface-active);
+      border-color: var(--text-primary);
+    }
+
+    .mode-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .mode-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .mode-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .mode-radio {
+      width: 14px;
+      height: 14px;
+      border: 1px solid var(--border-focus);
+      border-radius: 50%;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .mode-card.selected .mode-radio {
+      border-color: var(--accent);
+    }
+
+    .mode-card.selected .mode-radio::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    /* Slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      appearance: none;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-primary);
+      border: 2px solid var(--surface);
+      cursor: pointer;
+    }
+
+    .slider-number {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      min-width: 32px;
+      text-align: right;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .slider-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Actions */
+    .btn-apply {
+      width: 100%;
+      background: var(--text-primary);
+      color: var(--bg);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn-apply:active {
+      opacity: 0.85;
+      transform: scale(0.99);
+    }
+
+    .btn-apply:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* Status Banner */
+    .banner {
+      margin-top: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      display: none;
+    }
+
+    .banner.success {
+      display: block;
+      background: rgba(46, 204, 113, 0.1);
+      border: 1px solid rgba(46, 204, 113, 0.25);
+      color: #2ecc71;
+    }
+
+    .banner.error {
+      display: block;
+      background: rgba(229, 57, 53, 0.1);
+      border: 1px solid rgba(229, 57, 53, 0.25);
+      color: #ef5350;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">Virtual Memory Control</div>
+    <div class="header-meta">GALAGA · KERNEL 6.1</div>
+  </div>
+
+  <!-- Topology Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Memory Allocation</span>
+      <span class="card-badge" id="badge-total">8 + 8 GB</span>
+    </div>
+
+    <!-- Segmented allocation bar -->
+    <div class="memory-visualizer" title="Memory Allocation Map">
+      <div class="segment-phys-used" id="bar-phys-used" style="width: 45%;"></div>
+      <div class="segment-phys-free" id="bar-phys-free" style="width: 5%;"></div>
+      <div class="segment-virt-used" id="bar-virt-used" style="width: 20%;"></div>
+      <div class="segment-virt-free" id="bar-virt-free" style="width: 30%;"></div>
+    </div>
+
+    <div class="telemetry-grid">
+      <div class="telemetry-item">
+        <span class="telemetry-label">Physical RAM</span>
+        <span class="telemetry-value" id="val-phys">7,581 MB</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Available RAM</span>
+        <span class="telemetry-value" id="val-avail">-- MB</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Swap / Virtual Pool</span>
+        <span class="telemetry-value accent" id="val-swap-total">-- MB</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">Active Swapped</span>
+        <span class="telemetry-value" id="val-swap-used">-- MB</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Parameters Card -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Configuration</span>
+    </div>
+
+    <!-- Extension Size Chips -->
+    <label class="field-label">Virtual Extension Size</label>
+    <div class="chip-group" id="chips-size">
+      <div class="chip" data-size="4096">+4G</div>
+      <div class="chip" data-size="6144">+6G</div>
+      <div class="chip selected" data-size="8192">+8G</div>
+      <div class="chip" data-size="10240">+10G</div>
+      <div class="chip" data-size="12288">+12G</div>
+    </div>
+
+    <!-- Profile Mode -->
+    <label class="field-label">Backing Architecture</label>
+    <div class="mode-group" id="modes">
+      <div class="mode-card selected" data-mode="hybrid">
+        <div class="mode-text">
+          <span class="mode-title">Hybrid (zRAM + Storage Swap)</span>
+          <span class="mode-desc">zRAM fast tier + UFS flash overflow pool</span>
+        </div>
+        <div class="mode-radio"></div>
+      </div>
+      <div class="mode-card" data-mode="zram">
+        <div class="mode-text">
+          <span class="mode-title">zRAM Compressed (In-RAM Only)</span>
+          <span class="mode-desc">Ultra-fast zstd stream, zero flash wear</span>
+        </div>
+        <div class="mode-radio"></div>
+      </div>
+      <div class="mode-card" data-mode="storage">
+        <div class="mode-text">
+          <span class="mode-title">Storage Swapfile Only</span>
+          <span class="mode-desc">Dedicated /data block device (Stock Nothing style)</span>
+        </div>
+        <div class="mode-radio"></div>
+      </div>
+    </div>
+
+    <!-- Kernel Swappiness -->
+    <label class="field-label">Kernel Swappiness Ratio</label>
+    <div class="slider-row">
+      <input type="range" id="input-swappiness" min="0" max="200" step="5" value="130">
+      <span class="slider-number" id="label-swappiness">130</span>
+    </div>
+    <div class="slider-meta">
+      <span>0 (Physical Priority)</span>
+      <span>100 (Balanced)</span>
+      <span>200 (Aggressive)</span>
+    </div>
+
+    <!-- Apply Button -->
+    <button class="btn-apply" id="btn-apply" onclick="applyConfiguration()">
+      Apply Configuration
+    </button>
+    <div class="banner" id="banner"></div>
+  </div>
+
+  <script>
+    let selectedSize = 8192;
+    let selectedMode = "hybrid";
+
+    // Setup chip listeners
+    document.querySelectorAll('#chips-size .chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#chips-size .chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        selectedSize = parseInt(chip.getAttribute('data-size'));
+        updateBadge();
+      });
+    });
+
+    // Setup mode listeners
+    document.querySelectorAll('#modes .mode-card').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('#modes .mode-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        selectedMode = card.getAttribute('data-mode');
+      });
+    });
+
+    // Setup slider listener
+    const slider = document.getElementById('input-swappiness');
+    const sliderLabel = document.getElementById('label-swappiness');
+    slider.addEventListener('input', () => {
+      sliderLabel.textContent = slider.value;
+    });
+
+    function updateBadge() {
+      const gbs = selectedSize / 1024;
+      document.getElementById('badge-total').textContent = `8 + ${gbs} GB`;
+    }
+
+    async function exec(cmd) {
+      if (window.ksu && typeof window.ksu.exec === 'function') {
+        const raw = await window.ksu.exec(cmd);
+        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+      }
+      return { errno: 0, stdout: "" };
+    }
+
+    async function loadTelemetry() {
+      try {
+        const res = await exec("cat /proc/meminfo");
+        if (res && res.stdout) {
+          let memTotal = 0, memAvail = 0, swapTotal = 0, swapFree = 0;
+          res.stdout.split('\n').forEach(line => {
+            if (line.startsWith('MemTotal:')) memTotal = parseInt(line.replace(/\D/g, '')) / 1024;
+            if (line.startsWith('MemAvailable:')) memAvail = parseInt(line.replace(/\D/g, '')) / 1024;
+            if (line.startsWith('SwapTotal:')) swapTotal = parseInt(line.replace(/\D/g, '')) / 1024;
+            if (line.startsWith('SwapFree:')) swapFree = parseInt(line.replace(/\D/g, '')) / 1024;
+          });
+
+          const memUsed = Math.max(0, memTotal - memAvail);
+          const swapUsed = Math.max(0, swapTotal - swapFree);
+
+          document.getElementById('val-phys').textContent = `${Math.round(memTotal).toLocaleString()} MB`;
+          document.getElementById('val-avail').textContent = `${Math.round(memAvail).toLocaleString()} MB`;
+          document.getElementById('val-swap-total').textContent = `${Math.round(swapTotal).toLocaleString()} MB`;
+          document.getElementById('val-swap-used').textContent = `${Math.round(swapUsed).toLocaleString()} MB`;
+
+          // Proportional bar calculation
+          const totalCapacity = memTotal + (swapTotal || 1);
+          const pUsedPct = (memUsed / totalCapacity) * 100;
+          const pFreePct = (memAvail / totalCapacity) * 100;
+          const sUsedPct = (swapUsed / totalCapacity) * 100;
+          const sFreePct = Math.max(0, 100 - (pUsedPct + pFreePct + sUsedPct));
+
+          document.getElementById('bar-phys-used').style.width = `${pUsedPct}%`;
+          document.getElementById('bar-phys-free').style.width = `${pFreePct}%`;
+          document.getElementById('bar-virt-used').style.width = `${sUsedPct}%`;
+          document.getElementById('bar-virt-free').style.width = `${sFreePct}%`;
+        }
+      } catch (e) {
+        console.error("Telemetry error", e);
+      }
+    }
+
+    async function applyConfiguration() {
+      const btn = document.getElementById('btn-apply');
+      const banner = document.getElementById('banner');
+      const swappiness = slider.value;
+
+      btn.disabled = true;
+      btn.textContent = "Applying...";
+      banner.className = "banner";
+      banner.style.display = "none";
+
+      try {
+        const conf = `EXTENSION_SIZE_MB=${selectedSize}\\nSWAP_MODE=${selectedMode}\\nSWAPPINESS=${swappiness}\\nPAGE_CLUSTER=0`;
+        await exec(`echo -e "${conf}" > /data/adb/ram_booster.conf`);
+        await exec(`/data/adb/modules/galaga_ram_booster/service.sh`);
+
+        banner.className = "banner success";
+        banner.textContent = "Topology applied: " + (selectedSize / 1024) + " GB (" + selectedMode + ")";
+        banner.style.display = "block";
+        setTimeout(loadTelemetry, 800);
+      } catch (err) {
+        banner.className = "banner error";
+        banner.textContent = "Execution failure: " + err.message;
+        banner.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Apply Configuration";
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadTelemetry();
+      setInterval(loadTelemetry, 4000);
+    });
+  </script>
+</body>
+</html>
