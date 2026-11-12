@@ -1,7 +1,6 @@
 package com.galaga.ramhook;
 
 import android.app.ActivityManager;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -29,9 +28,8 @@ public class HookInit implements IXposedHookLoadPackage {
                         ActivityManager.MemoryInfo info = (ActivityManager.MemoryInfo) param.args[0];
                         if (info != null) {
                             info.totalMem += BOOST_RAM_BYTES;
-                            // Also adjust availMem so total - availMem doesn't falsely report 92%+ used
-                            info.availMem += BOOST_RAM_BYTES;
-                            XposedBridge.log("[GalagaHook] ActivityManager.getMemoryInfo boosted totalMem=" + info.totalMem + " availMem=" + info.availMem);
+                            // Leave info.availMem untouched here to protect LowMemoryKiller (LMK)
+                            // and prevent double-boosting in UI text formatters.
                         }
                     }
                 }
@@ -58,16 +56,19 @@ public class HookInit implements IXposedHookLoadPackage {
                                 XposedBridge.log("[GalagaHook] Replaced Settings RAM text -> " + param.args[0]);
                             }
                             // Recents Panel in Launcher3:
-                            // Format: "%1$s available | %2$s"
-                            // If user sees "3.5 GB available | 7.8 GB" -> we can optionally boost available to "11.5 GB available | 16 GB"
+                            // Original text from Launcher3: "X.X GB available | 7.8 GB" (or 16 GB)
                             else if (str.contains("available |") || str.contains("Available |")) {
-                                // Match: "X.X GB available | Y.Y GB"
                                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*GB\\s*(available\\s*\\|)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*GB", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(str);
                                 if (m.find()) {
                                     try {
-                                        double availGb = Double.parseDouble(m.group(1));
-                                        double boostedAvail = availGb + 8.0; // Add 8 GB virtual pool
-                                        String formatted = String.format(java.util.Locale.US, "%.1f GB %s 16 GB", boostedAvail, m.group(2));
+                                        double rawAvail = Double.parseDouble(m.group(1));
+                                        // If rawAvail is physical (~3.5 GB), add 8 GB virtual pool = 11.5 GB
+                                        // If it was already over 8 GB, don't add again
+                                        double totalAvail = rawAvail < 8.0 ? (rawAvail + 8.0) : rawAvail;
+                                        if (totalAvail > 15.5) {
+                                            totalAvail = 15.0;
+                                        }
+                                        String formatted = String.format(java.util.Locale.US, "%.1f GB %s 16 GB", totalAvail, m.group(2));
                                         param.args[0] = formatted;
                                         XposedBridge.log("[GalagaHook] Replaced Recents RAM: " + str + " -> " + formatted);
                                     } catch (Throwable ignored) {
@@ -104,9 +105,12 @@ public class HookInit implements IXposedHookLoadPackage {
                                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*GB\\s*(available\\s*\\|)\\s*([0-9]+(?:\\.[0-9]+)?)\\s*GB", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(str);
                                 if (m.find()) {
                                     try {
-                                        double availGb = Double.parseDouble(m.group(1));
-                                        double boostedAvail = availGb + 8.0;
-                                        param.args[0] = String.format(java.util.Locale.US, "%.1f GB %s 16 GB", boostedAvail, m.group(2));
+                                        double rawAvail = Double.parseDouble(m.group(1));
+                                        double totalAvail = rawAvail < 8.0 ? (rawAvail + 8.0) : rawAvail;
+                                        if (totalAvail > 15.5) {
+                                            totalAvail = 15.0;
+                                        }
+                                        param.args[0] = String.format(java.util.Locale.US, "%.1f GB %s 16 GB", totalAvail, m.group(2));
                                     } catch (Throwable ignored) {
                                         param.args[0] = str.replaceAll("(?i)(\\|\\s*)(7\\.[0-9]|8\\.[0-9]|8)\\s*GB", "$116 GB");
                                     }
@@ -134,7 +138,6 @@ public class HookInit implements IXposedHookLoadPackage {
                             Object memInfo = param.args[4];
                             if (memInfo != null) {
                                 try {
-                                    // Set a healthy, realistic 28% memory utilization (green bar)
                                     XposedHelpers.setIntField(memInfo, "usedRamPercentage", 28);
                                     XposedBridge.log("[GalagaHook] Set usedRamPercentage to 28%");
                                 } catch (Throwable t) {
