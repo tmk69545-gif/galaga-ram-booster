@@ -166,15 +166,3 @@ PAGE_CLUSTER=0
 ```
 Changes apply immediately or on next reboot.
 
----
-
-## 🗑️ Clean Uninstallation
-
-1. Open your Root Manager (**KernelSU** / **Magisk**).
-2. Tap **Remove** on **Galaga RAM Booster**.
-3. The module's [`uninstall.sh`](file:///home/unknown/Desktop/ram%20boost%20for%20galaga/uninstall.sh) script will automatically:
-   - Deactivate all swap devices (`swapoff`).
-   - Delete `/data/swap/ram_booster.swap` and reclaim the 8 GB storage space.
-   - Clean up `/data/adb/ram_booster.conf`.
-4. Uninstall the **Galaga 8+8 RAM Hook** APK normally via Android App Info.
-5. Reboot your device.
