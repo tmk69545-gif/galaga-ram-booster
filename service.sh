@@ -18,8 +18,10 @@ while [ "$(getprop sys.boot_completed)" != "1" ]; do
     fi
 done
 
-# Small sleep to let disk I/O settle
-sleep 5
+# If we had to wait for boot, give disk I/O a few seconds to settle
+if [ "$boot_counter" -gt 0 ]; then
+    sleep 5
+fi
 
 # Load configuration
 CONF_FILE="/data/adb/ram_booster.conf"
@@ -87,9 +89,10 @@ if [ "$SWAP_MODE" = "hybrid" ] || [ "$SWAP_MODE" = "storage" ]; then
     RECREATE=0
     if [ -f "$SWAP_FILE" ]; then
         CURRENT_SIZE_BYTES=$(stat -c%s "$SWAP_FILE" 2>/dev/null || stat -f%z "$SWAP_FILE" 2>/dev/null)
-        TARGET_SIZE_BYTES=$((EXTENSION_SIZE_MB * 1024 * 1024))
-        if [ "$CURRENT_SIZE_BYTES" != "$TARGET_SIZE_BYTES" ]; then
-            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Size mismatch ($CURRENT_SIZE_BYTES != $TARGET_SIZE_BYTES). Recreating..." >> "$LOG_FILE"
+        [ -z "$CURRENT_SIZE_BYTES" ] && CURRENT_SIZE_BYTES=0
+        CURRENT_SIZE_MB=$((CURRENT_SIZE_BYTES / 1048576))
+        if [ "$CURRENT_SIZE_MB" -ne "$EXTENSION_SIZE_MB" ]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Size mismatch (${CURRENT_SIZE_MB}MB != ${EXTENSION_SIZE_MB}MB). Recreating..." >> "$LOG_FILE"
             swapoff "$SWAP_FILE" 2>/dev/null
             rm -f "$SWAP_FILE"
             RECREATE=1

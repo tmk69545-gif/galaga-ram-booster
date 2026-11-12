@@ -506,8 +506,20 @@
 
     async function exec(cmd) {
       if (window.ksu && typeof window.ksu.exec === 'function') {
-        const raw = await window.ksu.exec(cmd);
-        return typeof raw === 'string' ? JSON.parse(raw) : raw;
+        try {
+          const res = await window.ksu.exec(cmd);
+          // In KernelSU, window.ksu.exec(cmd) returns the raw stdout string directly
+          if (typeof res === 'string') {
+            return { errno: 0, stdout: res };
+          }
+          if (res && typeof res === 'object') {
+            return { errno: res.errno || 0, stdout: res.stdout || "" };
+          }
+          return { errno: 0, stdout: String(res || "") };
+        } catch (e) {
+          console.error("ksu.exec error:", e);
+          return { errno: 1, stdout: "", stderr: String(e) };
+        }
       }
       return { errno: 0, stdout: "" };
     }
@@ -560,17 +572,20 @@
       banner.style.display = "none";
 
       try {
-        const conf = `EXTENSION_SIZE_MB=${selectedSize}\\nSWAP_MODE=${selectedMode}\\nSWAPPINESS=${swappiness}\\nPAGE_CLUSTER=0`;
-        await exec(`echo -e "${conf}" > /data/adb/ram_booster.conf`);
+        await exec(`printf 'EXTENSION_SIZE_MB=%s\\nSWAP_MODE=%s\\nSWAPPINESS=%s\\nPAGE_CLUSTER=0\\n' "${selectedSize}" "${selectedMode}" "${swappiness}" > /data/adb/ram_booster.conf`);
         await exec(`/data/adb/modules/galaga_ram_booster/service.sh`);
 
+        if (window.ksu && typeof window.ksu.toast === 'function') {
+          window.ksu.toast(`Applied +${selectedSize / 1024} GB (${selectedMode})`);
+        }
+
         banner.className = "banner success";
-        banner.textContent = "Topology applied: " + (selectedSize / 1024) + " GB (" + selectedMode + ")";
+        banner.textContent = "Applied: +" + (selectedSize / 1024) + " GB (" + selectedMode + ")";
         banner.style.display = "block";
         setTimeout(loadTelemetry, 800);
       } catch (err) {
         banner.className = "banner error";
-        banner.textContent = "Execution failure: " + err.message;
+        banner.textContent = "Execution failure: " + (err.message || String(err));
         banner.style.display = "block";
       } finally {
         btn.disabled = false;
